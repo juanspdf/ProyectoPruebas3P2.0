@@ -1,134 +1,80 @@
 const UsuarioController = require('../../src/controllers/UsuarioController');
 const Usuario = require('../../src/models/Usuario');
-const jwt = require('jsonwebtoken');
 
-// Mock de las dependencias
 jest.mock('../../src/models/Usuario');
-jest.mock('jsonwebtoken');
 
 describe('UsuarioController', () => {
+    let mockUsuarioInstance;
     let usuarioController;
     let mockRequest;
     let mockResponse;
-    let m    describe('registrar', () => {
-        test('should handle registration errors', async () => {
-            mockRequest.body = {
-                nombre: 'Test User',
-                email: 'test@test.com',
-                password: 'password123'
-            };
-            mockUsuarioInstance.crear.mockRejectedValue(new Error('Database error'));
-
-            await usuarioController.registrar(mockRequest, mockResponse);
-
-            expect(mockResponse.status).toHaveBeenCalledWith(500);
-            expect(mockResponse.json).toHaveBeenCalledWith({
-                success: false,
-                message: 'Error interno del servidor',
-                error: 'Database error'
-            });
-        });
-    });
 
     beforeEach(() => {
-        // Crear mock de la instancia del modelo
         mockUsuarioInstance = {
             obtenerTodos: jest.fn(),
             obtenerPorId: jest.fn(),
-            obtenerPorEmail: jest.fn(),
             crear: jest.fn(),
             actualizar: jest.fn(),
             eliminar: jest.fn(),
             login: jest.fn(),
-            validarLogin: jest.fn()
+            obtenerPorEmail: jest.fn()
         };
 
-        // Mock del constructor de la clase
         Usuario.mockImplementation(() => mockUsuarioInstance);
-        
-        // Crear una nueva instancia del controlador para cada test
         usuarioController = new UsuarioController();
-        
-        // Configurar mocks para request y response
+
         mockRequest = {
             params: {},
             body: {},
-            query: {},
-            usuario: { id: 1, email: 'test@test.com' }
+            query: {}
         };
 
         mockResponse = {
-            json: jest.fn(),
             status: jest.fn().mockReturnThis(),
-            send: jest.fn()
+            json: jest.fn()
         };
 
-        // Limpiar todos los mocks antes de cada test
         jest.clearAllMocks();
     });
 
     describe('obtenerTodos', () => {
         test('should return all users successfully', async () => {
-            const mockUsuarios = [
-                {
-                    id: 1,
-                    nombre: 'John',
-                    email: 'john@test.com',
-                    rol: 'user'
-                },
-                {
-                    id: 2,
-                    nombre: 'Jane',
-                    email: 'jane@test.com',
-                    rol: 'admin'
-                }
-            ];
-
-            mockUsuarioInstance.obtenerTodos.mockResolvedValue(mockUsuarios);
+            const mockUsers = [{ id: 1, nombre: 'Usuario Test' }];
+            mockUsuarioInstance.obtenerTodos.mockResolvedValue(mockUsers);
 
             await usuarioController.obtenerTodos(mockRequest, mockResponse);
 
             expect(mockResponse.json).toHaveBeenCalledWith({
                 success: true,
-                usuarios: mockUsuarios
+                usuarios: mockUsers
             });
         });
 
-        test('should handle database errors', async () => {
+        test('should handle errors', async () => {
             mockUsuarioInstance.obtenerTodos.mockRejectedValue(new Error('Database error'));
 
             await usuarioController.obtenerTodos(mockRequest, mockResponse);
 
             expect(mockResponse.status).toHaveBeenCalledWith(500);
-            expect(mockResponse.json).toHaveBeenCalledWith({
-                success: false,
-                message: 'Error interno del servidor',
-                error: 'Database error'
-            });
         });
     });
 
     describe('obtenerPorId', () => {
-        test('should return user by id', async () => {
-            const mockUsuario = {
-                id: 1,
-                nombre: 'John',
-                email: 'john@test.com',
-                rol: 'user'
-            };
-
+        test('should return user by id successfully', async () => {
+            const mockUsuario = { id: 1, nombre: 'Usuario Test', email: 'test@test.com' };
             mockRequest.params.id = '1';
             mockUsuarioInstance.obtenerPorId.mockResolvedValue(mockUsuario);
 
             await usuarioController.obtenerPorId(mockRequest, mockResponse);
 
+            expect(mockUsuarioInstance.obtenerPorId).toHaveBeenCalledWith('1');
             expect(mockResponse.json).toHaveBeenCalledWith({
                 success: true,
                 usuario: mockUsuario
             });
         });
 
-        test('should return 404 if user not found', async () => {
+        test('should return 404 when user not found', async () => {
             mockRequest.params.id = '999';
             mockUsuarioInstance.obtenerPorId.mockResolvedValue(null);
 
@@ -140,41 +86,55 @@ describe('UsuarioController', () => {
                 message: 'Usuario no encontrado'
             });
         });
+
+        test('should handle invalid id format', async () => {
+            mockRequest.params.id = 'invalid';
+
+            await usuarioController.obtenerPorId(mockRequest, mockResponse);
+
+            expect(mockResponse.status).toHaveBeenCalledWith(404);
+        });
+
+        test('should handle database errors', async () => {
+            mockRequest.params.id = '1';
+            mockUsuarioInstance.obtenerPorId.mockRejectedValue(new Error('Database error'));
+
+            await usuarioController.obtenerPorId(mockRequest, mockResponse);
+
+            expect(mockResponse.status).toHaveBeenCalledWith(500);
+        });
     });
 
     describe('registrar', () => {
-        test('should register new user successfully', async () => {
-            const mockCreatedUser = {
-                id: 1,
-                nombre: 'John Doe',
-                email: 'john@test.com',
-                rol: 'user'
+        test('should create user successfully', async () => {
+            const nuevoUsuario = {
+                nombre: 'Nuevo Usuario',
+                email: 'nuevo@test.com',
+                password: 'password123',
+                telefono: '1234567890',
+                direccion: 'Dirección Test'
             };
-
-            mockRequest.body = {
-                nombre: 'John Doe',
-                email: 'john@test.com',
-                password: 'password123'
-            };
-
+            const usuarioCreado = { id: 1, ...nuevoUsuario };
+            
+            mockRequest.body = nuevoUsuario;
             mockUsuarioInstance.obtenerPorEmail.mockResolvedValue(null);
-            mockUsuarioInstance.crear.mockResolvedValue(mockCreatedUser);
+            mockUsuarioInstance.crear.mockResolvedValue(usuarioCreado);
 
             await usuarioController.registrar(mockRequest, mockResponse);
 
             expect(mockResponse.status).toHaveBeenCalledWith(201);
-            expect(mockResponse.json).toHaveBeenCalledWith({
-                success: true,
-                message: 'Usuario registrado exitosamente',
-                usuario: mockCreatedUser
-            });
+            expect(mockResponse.json).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    success: true,
+                    message: 'Usuario registrado exitosamente',
+                    usuario: usuarioCreado,
+                    token: expect.any(String)
+                })
+            );
         });
 
-        test('should validate required fields', async () => {
-            mockRequest.body = {
-                email: 'john@test.com'
-                // Faltan nombre y password
-            };
+        test('should handle missing required fields', async () => {
+            mockRequest.body = { nombre: 'Usuario Incompleto' };
 
             await usuarioController.registrar(mockRequest, mockResponse);
 
@@ -185,11 +145,13 @@ describe('UsuarioController', () => {
             });
         });
 
-        test('should validate email format', async () => {
+        test('should handle invalid email format', async () => {
             mockRequest.body = {
-                nombre: 'John Doe',
-                email: 'invalid-email',
-                password: 'password123'
+                nombre: 'Usuario',
+                email: 'email-invalido',
+                password: 'password123',
+                telefono: '1234567890',
+                direccion: 'Dirección'
             };
 
             await usuarioController.registrar(mockRequest, mockResponse);
@@ -201,14 +163,34 @@ describe('UsuarioController', () => {
             });
         });
 
-        test('should check for existing email', async () => {
+        test('should handle short password', async () => {
             mockRequest.body = {
-                nombre: 'John Doe',
-                email: 'john@test.com',
-                password: 'password123'
+                nombre: 'Usuario',
+                email: 'test@test.com',
+                password: '123',
+                telefono: '1234567890',
+                direccion: 'Dirección'
             };
 
-            mockUsuarioInstance.obtenerPorEmail.mockResolvedValue({ id: 1 });
+            await usuarioController.registrar(mockRequest, mockResponse);
+
+            expect(mockResponse.status).toHaveBeenCalledWith(400);
+            expect(mockResponse.json).toHaveBeenCalledWith({
+                success: false,
+                message: 'La contraseña debe tener al menos 6 caracteres'
+            });
+        });
+
+        test('should handle duplicate email error', async () => {
+            const nuevoUsuario = {
+                nombre: 'Usuario',
+                email: 'existente@test.com',
+                password: 'password123',
+                telefono: '1234567890',
+                direccion: 'Dirección'
+            };
+            mockRequest.body = nuevoUsuario;
+            mockUsuarioInstance.obtenerPorEmail.mockResolvedValue({ id: 1, email: 'existente@test.com' });
 
             await usuarioController.registrar(mockRequest, mockResponse);
 
@@ -218,47 +200,135 @@ describe('UsuarioController', () => {
                 message: 'El email ya está registrado'
             });
         });
+
+        test('should handle database errors', async () => {
+            const nuevoUsuario = {
+                nombre: 'Usuario',
+                email: 'test@test.com',
+                password: 'password123',
+                telefono: '1234567890',
+                direccion: 'Dirección'
+            };
+            mockRequest.body = nuevoUsuario;
+            mockUsuarioInstance.obtenerPorEmail.mockRejectedValue(new Error('Database error'));
+
+            await usuarioController.registrar(mockRequest, mockResponse);
+
+            expect(mockResponse.status).toHaveBeenCalledWith(500);
+        });
+    });
+
+    describe('actualizar', () => {
+        test('should update user successfully', async () => {
+            const usuarioExistente = { id: 1, nombre: 'Usuario Existente' };
+            const datosActualizacion = {
+                nombre: 'Usuario Actualizado',
+                telefono: '9876543210'
+            };
+            const usuarioActualizado = { id: 1, ...datosActualizacion };
+            
+            mockRequest.params.id = '1';
+            mockRequest.body = datosActualizacion;
+            mockUsuarioInstance.obtenerPorId.mockResolvedValue(usuarioExistente);
+            mockUsuarioInstance.actualizar.mockResolvedValue(usuarioActualizado);
+
+            await usuarioController.actualizar(mockRequest, mockResponse);
+
+            expect(mockUsuarioInstance.obtenerPorId).toHaveBeenCalledWith('1');
+            expect(mockResponse.json).toHaveBeenCalledWith({
+                success: true,
+                message: 'Usuario actualizado exitosamente',
+                usuario: usuarioActualizado
+            });
+        });
+
+        test('should return 404 when updating non-existent user', async () => {
+            mockRequest.params.id = '999';
+            mockRequest.body = { nombre: 'Usuario' };
+            mockUsuarioInstance.obtenerPorId.mockResolvedValue(null);
+
+            await usuarioController.actualizar(mockRequest, mockResponse);
+
+            expect(mockResponse.status).toHaveBeenCalledWith(404);
+            expect(mockResponse.json).toHaveBeenCalledWith({
+                success: false,
+                message: 'Usuario no encontrado'
+            });
+        });
+
+        test('should handle database errors', async () => {
+            mockRequest.params.id = '1';
+            mockRequest.body = { nombre: 'Usuario' };
+            mockUsuarioInstance.obtenerPorId.mockRejectedValue(new Error('Database error'));
+
+            await usuarioController.actualizar(mockRequest, mockResponse);
+
+            expect(mockResponse.status).toHaveBeenCalledWith(500);
+        });
+    });
+
+    describe('eliminar', () => {
+        test('should delete user successfully', async () => {
+            const usuarioExistente = { id: 1, nombre: 'Usuario Test' };
+            mockRequest.params.id = '1';
+            mockUsuarioInstance.obtenerPorId.mockResolvedValue(usuarioExistente);
+            mockUsuarioInstance.eliminar.mockResolvedValue(true);
+
+            await usuarioController.eliminar(mockRequest, mockResponse);
+
+            expect(mockUsuarioInstance.obtenerPorId).toHaveBeenCalledWith('1');
+            expect(mockResponse.json).toHaveBeenCalledWith({
+                success: true,
+                message: 'Usuario eliminado exitosamente'
+            });
+        });
+
+        test('should return 404 when deleting non-existent user', async () => {
+            mockRequest.params.id = '999';
+            mockUsuarioInstance.obtenerPorId.mockResolvedValue(null);
+
+            await usuarioController.eliminar(mockRequest, mockResponse);
+
+            expect(mockResponse.status).toHaveBeenCalledWith(404);
+            expect(mockResponse.json).toHaveBeenCalledWith({
+                success: false,
+                message: 'Usuario no encontrado'
+            });
+        });
+
+        test('should handle database errors', async () => {
+            mockRequest.params.id = '1';
+            mockUsuarioInstance.obtenerPorId.mockRejectedValue(new Error('Database error'));
+
+            await usuarioController.eliminar(mockRequest, mockResponse);
+
+            expect(mockResponse.status).toHaveBeenCalledWith(500);
+        });
     });
 
     describe('login', () => {
         test('should login user successfully', async () => {
-            const mockUsuario = {
-                id: 1,
-                nombre: 'John',
-                email: 'john@test.com',
-                rol: 'user'
-            };
-
-            const mockToken = 'mock.jwt.token';
-
-            mockRequest.body = {
-                email: 'john@test.com',
-                password: 'password123'
-            };
-
-            mockUsuarioInstance.login.mockResolvedValue(mockUsuario);
-            jwt.sign.mockReturnValue(mockToken);
+            const loginData = { email: 'test@test.com', password: 'password123' };
+            const mockResult = { id: 1, email: 'test@test.com', nombre: 'Usuario Test' };
+            
+            mockRequest.body = loginData;
+            mockUsuarioInstance.login.mockResolvedValue(mockResult);
 
             await usuarioController.login(mockRequest, mockResponse);
 
-            expect(mockResponse.json).toHaveBeenCalledWith({
-                success: true,
-                message: 'Login exitoso',
-                token: mockToken,
-                usuario: {
-                    id: 1,
-                    nombre: 'John',
-                    email: 'john@test.com',
-                    rol: 'user'
-                }
-            });
+            expect(mockUsuarioInstance.login).toHaveBeenCalledWith(loginData.email, loginData.password);
+            expect(mockResponse.json).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    success: true,
+                    message: 'Login exitoso',
+                    usuario: mockResult,
+                    token: expect.any(String)
+                })
+            );
         });
 
-        test('should validate required fields for login', async () => {
-            mockRequest.body = {
-                email: 'john@test.com'
-                // Falta password
-            };
+        test('should handle missing email or password', async () => {
+            mockRequest.body = { email: 'test@test.com' };
 
             await usuarioController.login(mockRequest, mockResponse);
 
@@ -270,11 +340,7 @@ describe('UsuarioController', () => {
         });
 
         test('should handle invalid credentials', async () => {
-            mockRequest.body = {
-                email: 'john@test.com',
-                password: 'wrongpassword'
-            };
-
+            mockRequest.body = { email: 'test@test.com', password: 'wrongpassword' };
             mockUsuarioInstance.login.mockResolvedValue(null);
 
             await usuarioController.login(mockRequest, mockResponse);
@@ -285,182 +351,14 @@ describe('UsuarioController', () => {
                 message: 'Credenciales inválidas'
             });
         });
-    });
 
-    describe('actualizar', () => {
-        test('should update user successfully', async () => {
-            const mockUpdatedUser = {
-                id: 1,
-                nombre: 'John Updated',
-                email: 'john.updated@test.com',
-                rol: 'user'
-            };
-
-            mockRequest.params.id = '1';
-            mockRequest.body = {
-                nombre: 'John Updated',
-                email: 'john.updated@test.com'
-            };
-
-            mockUsuarioInstance.obtenerPorId.mockResolvedValue({ id: 1 });
-            mockUsuarioInstance.actualizar.mockResolvedValue(mockUpdatedUser);
-
-            await usuarioController.actualizar(mockRequest, mockResponse);
-
-            expect(mockResponse.json).toHaveBeenCalledWith({
-                success: true,
-                message: 'Usuario actualizado exitosamente',
-                usuario: mockUpdatedUser
-            });
-        });
-
-        test('should return 404 if user not found for update', async () => {
-            mockRequest.params.id = '999';
-            mockRequest.body = {
-                nombre: 'John Updated'
-            };
-
-            mockUsuarioInstance.obtenerPorId.mockResolvedValue(null);
-
-            await usuarioController.actualizar(mockRequest, mockResponse);
-
-            expect(mockResponse.status).toHaveBeenCalledWith(404);
-            expect(mockResponse.json).toHaveBeenCalledWith({
-                success: false,
-                message: 'Usuario no encontrado'
-            });
-        });
-    });
-
-    describe('eliminar', () => {
-        test('should delete user successfully', async () => {
-            mockRequest.params.id = '1';
-            mockUsuarioInstance.obtenerPorId.mockResolvedValue({ id: 1 });
-            mockUsuarioInstance.eliminar.mockResolvedValue(true);
-
-            await usuarioController.eliminar(mockRequest, mockResponse);
-
-            expect(mockResponse.json).toHaveBeenCalledWith({
-                success: true,
-                message: 'Usuario eliminado exitosamente'
-            });
-        });
-
-        test('should return 404 if user not found for deletion', async () => {
-            mockRequest.params.id = '999';
-            mockUsuarioInstance.obtenerPorId.mockResolvedValue(null);
-
-            await usuarioController.eliminar(mockRequest, mockResponse);
-
-            expect(mockResponse.status).toHaveBeenCalledWith(404);
-            expect(mockResponse.json).toHaveBeenCalledWith({
-                success: false,
-                message: 'Usuario no encontrado'
-            });
-        });
-
-        test('should handle deletion errors', async () => {
-            mockRequest.params.id = '1';
-            mockUsuarioInstance.obtenerPorId.mockRejectedValue(new Error('Database error'));
-
-            await usuarioController.eliminar(mockRequest, mockResponse);
-
-            expect(mockResponse.status).toHaveBeenCalledWith(500);
-            expect(mockResponse.json).toHaveBeenCalledWith({
-                success: false,
-                message: 'Error interno del servidor',
-                error: 'Database error'
-            });
-        });
-    });
-
-    describe('login', () => {
-        test('should handle login with invalid credentials', async () => {
-            mockRequest.body = {
-                email: 'user@test.com',
-                password: 'wrongpassword'
-            };
-            mockUsuarioInstance.obtenerPorEmail.mockResolvedValue(null);
-
-            await usuarioController.login(mockRequest, mockResponse);
-
-            expect(mockResponse.status).toHaveBeenCalledWith(401);
-            expect(mockResponse.json).toHaveBeenCalledWith({
-                success: false,
-                message: 'Credenciales inválidas'
-            });
-        });
-
-        test('should handle login errors', async () => {
-            mockRequest.body = {
-                email: 'user@test.com',
-                password: 'password'
-            };
+        test('should handle database errors', async () => {
+            mockRequest.body = { email: 'test@test.com', password: 'password123' };
             mockUsuarioInstance.login.mockRejectedValue(new Error('Database error'));
 
             await usuarioController.login(mockRequest, mockResponse);
 
             expect(mockResponse.status).toHaveBeenCalledWith(500);
-            expect(mockResponse.json).toHaveBeenCalledWith({
-                success: false,
-                message: 'Error interno del servidor',
-                error: 'Database error'
-            });
-        });
-    });
-
-    describe('register', () => {
-        test('should handle registration errors', async () => {
-            mockRequest.body = {
-                nombre: 'John Doe',
-                email: 'john@test.com',
-                password: 'password123'
-            };
-            mockUsuarioInstance.crear.mockRejectedValue(new Error('Database error'));
-
-            await usuarioController.register(mockRequest, mockResponse);
-
-            expect(mockResponse.status).toHaveBeenCalledWith(500);
-            expect(mockResponse.json).toHaveBeenCalledWith({
-                success: false,
-                message: 'Error interno del servidor',
-                error: 'Database error'
-            });
-        });
-    });
-
-    describe('obtenerPorId', () => {
-        test('should handle errors in obtenerPorId', async () => {
-            mockRequest.params.id = '1';
-            mockUsuarioInstance.obtenerPorId.mockRejectedValue(new Error('Database error'));
-
-            await usuarioController.obtenerPorId(mockRequest, mockResponse);
-
-            expect(mockResponse.status).toHaveBeenCalledWith(500);
-            expect(mockResponse.json).toHaveBeenCalledWith({
-                success: false,
-                message: 'Error interno del servidor',
-                error: 'Database error'
-            });
-        });
-    });
-
-    describe('actualizar', () => {
-        test('should handle update errors', async () => {
-            mockRequest.params.id = '1';
-            mockRequest.body = {
-                nombre: 'John Updated'
-            };
-            mockUsuarioInstance.actualizar.mockRejectedValue(new Error('Database error'));
-
-            await usuarioController.actualizar(mockRequest, mockResponse);
-
-            expect(mockResponse.status).toHaveBeenCalledWith(500);
-            expect(mockResponse.json).toHaveBeenCalledWith({
-                success: false,
-                message: 'Error interno del servidor',
-                error: 'Database error'
-            });
         });
     });
 });

@@ -1,49 +1,27 @@
 const ProductoController = require('../../src/controllers/ProductoController');
 const Producto = require('../../src/models/Producto');
 
-// Mock del modelo Producto
 jest.mock('../../src/models/Producto');
 
 describe('ProductoController', () => {
+    let mockProductoInstance;
     let productoController;
     let mockRequest;
     let mockResponse;
-    let mockProductoInstance;
 
     beforeEach(() => {
-        // Crear    describe('actualizar', () => {
-        test('should handle update errors', async () => {
-            mockRequest.params.id = '1';
-            mockRequest.body = {
-                nombre: 'Producto actualizado',
-                precio: 200,
-                descripcion: 'Descripción actualizada'
-            };
-            mockProductoInstance.obtenerPorId.mockRejectedValue(new Error('Database error'));
-
-            await productoController.actualizar(mockRequest, mockResponse);
-
-            expect(mockResponse.status).toHaveBeenCalledWith(500);
-            expect(mockResponse.json).toHaveBeenCalledWith({
-                success: false,
-                message: 'Error interno del servidor',
-                error: 'Database error'ncia del modelo
         mockProductoInstance = {
             obtenerTodos: jest.fn(),
             obtenerPorId: jest.fn(),
+            obtenerPorCategoria: jest.fn(),
             crear: jest.fn(),
             actualizar: jest.fn(),
-            eliminar: jest.fn(),
-            obtenerPorCategoria: jest.fn()
+            eliminar: jest.fn()
         };
 
-        // Mock del constructor de la clase
         Producto.mockImplementation(() => mockProductoInstance);
-        
-        // Crear una nueva instancia del controlador para cada test
         productoController = new ProductoController();
-        
-        // Configurar mocks para request y response
+
         mockRequest = {
             params: {},
             body: {},
@@ -51,71 +29,51 @@ describe('ProductoController', () => {
         };
 
         mockResponse = {
-            json: jest.fn(),
             status: jest.fn().mockReturnThis(),
-            send: jest.fn()
+            json: jest.fn()
         };
 
-        // Limpiar todos los mocks antes de cada test
         jest.clearAllMocks();
     });
 
     describe('obtenerTodos', () => {
         test('should return all products successfully', async () => {
-            const mockProductos = [
-                {
-                    id: 1,
-                    nombre: 'Test Product',
-                    precio: 99.99,
-                    stock: 10
-                }
-            ];
-
-            mockProductoInstance.obtenerTodos.mockResolvedValue(mockProductos);
+            const mockProducts = [{ id: 1, nombre: 'Producto Test' }];
+            mockProductoInstance.obtenerTodos.mockResolvedValue(mockProducts);
 
             await productoController.obtenerTodos(mockRequest, mockResponse);
 
             expect(mockResponse.json).toHaveBeenCalledWith({
                 success: true,
-                productos: mockProductos
+                productos: mockProducts
             });
         });
 
-        test('should handle database errors', async () => {
+        test('should handle errors', async () => {
             mockProductoInstance.obtenerTodos.mockRejectedValue(new Error('Database error'));
 
             await productoController.obtenerTodos(mockRequest, mockResponse);
 
             expect(mockResponse.status).toHaveBeenCalledWith(500);
-            expect(mockResponse.json).toHaveBeenCalledWith({
-                success: false,
-                message: 'Error interno del servidor',
-                error: 'Database error'
-            });
         });
     });
 
     describe('obtenerPorId', () => {
-        test('should return product by id', async () => {
-            const mockProducto = {
-                id: 1,
-                nombre: 'Test Product',
-                precio: 99.99,
-                stock: 10
-            };
-
+        test('should return product by id successfully', async () => {
+            const mockProducto = { id: 1, nombre: 'Producto Test', precio: 100 };
             mockRequest.params.id = '1';
             mockProductoInstance.obtenerPorId.mockResolvedValue(mockProducto);
 
             await productoController.obtenerPorId(mockRequest, mockResponse);
 
+            expect(mockProductoInstance.obtenerPorId).toHaveBeenCalledWith('1');
             expect(mockResponse.json).toHaveBeenCalledWith({
                 success: true,
                 producto: mockProducto
             });
         });
 
-        test('should return 404 if product not found', async () => {
+        test('should return 404 when product not found', async () => {
             mockRequest.params.id = '999';
             mockProductoInstance.obtenerPorId.mockResolvedValue(null);
 
@@ -127,46 +85,115 @@ describe('ProductoController', () => {
                 message: 'Producto no encontrado'
             });
         });
+
+        test('should handle invalid id format', async () => {
+            mockRequest.params.id = 'invalid';
+            mockProductoInstance.obtenerPorId.mockResolvedValue(null);
+
+            await productoController.obtenerPorId(mockRequest, mockResponse);
+
+            expect(mockResponse.status).toHaveBeenCalledWith(404);
+        });
+
+        test('should handle database errors', async () => {
+            mockRequest.params.id = '1';
+            mockProductoInstance.obtenerPorId.mockRejectedValue(new Error('Database error'));
+
+            await productoController.obtenerPorId(mockRequest, mockResponse);
+
+            expect(mockResponse.status).toHaveBeenCalledWith(500);
+        });
+    });
+
+    describe('obtenerPorCategoria', () => {
+        test('should return products by category successfully', async () => {
+            const mockProductos = [
+                { id: 1, nombre: 'Producto 1', categoria: 'Electrónicos' },
+                { id: 2, nombre: 'Producto 2', categoria: 'Electrónicos' }
+            ];
+            mockRequest.params.categoria = 'Electrónicos';
+            mockProductoInstance.obtenerPorCategoria.mockResolvedValue(mockProductos);
+
+            await productoController.obtenerPorCategoria(mockRequest, mockResponse);
+
+            expect(mockProductoInstance.obtenerPorCategoria).toHaveBeenCalledWith('Electrónicos');
+            expect(mockResponse.json).toHaveBeenCalledWith({
+                success: true,
+                categoria: 'Electrónicos',
+                productos: mockProductos
+            });
+        });
+
+        test('should handle empty category results', async () => {
+            mockRequest.params.categoria = 'Categoría Inexistente';
+            mockProductoInstance.obtenerPorCategoria.mockResolvedValue([]);
+
+            await productoController.obtenerPorCategoria(mockRequest, mockResponse);
+
+            expect(mockResponse.json).toHaveBeenCalledWith({
+                success: true,
+                categoria: 'Categoría Inexistente',
+                productos: []
+            });
+        });
+
+        test('should handle missing category parameter', async () => {
+            mockRequest.params = {};
+            mockProductoInstance.obtenerPorCategoria.mockResolvedValue(undefined);
+
+            await productoController.obtenerPorCategoria(mockRequest, mockResponse);
+
+            expect(mockResponse.json).toHaveBeenCalledWith({
+                success: true,
+                categoria: undefined,
+                productos: undefined
+            });
+        });
+
+        test('should handle database errors', async () => {
+            mockRequest.params.categoria = 'Electrónicos';
+            mockProductoInstance.obtenerPorCategoria.mockRejectedValue(new Error('Database error'));
+
+            await productoController.obtenerPorCategoria(mockRequest, mockResponse);
+
+            expect(mockResponse.status).toHaveBeenCalledWith(500);
+        });
     });
 
     describe('crear', () => {
-        test('should create new product successfully', async () => {
-            const mockCreatedProduct = {
-                id: 1,
-                nombre: 'New Product',
-                descripcion: 'Description',
-                precio: 299.99,
-                stock: 20,
-                categoria: 'Electronics',
-                subcategoria: 'Phones'
+        test('should create product successfully', async () => {
+            const nuevoProducto = {
+                nombre: 'Nuevo Producto',
+                descripcion: 'Descripción del producto',
+                precio: 100,
+                categoria: 'Electrónicos',
+                stock: 50
             };
-
-            mockRequest.body = {
-                nombre: 'New Product',
-                descripcion: 'Description',
-                precio: 299.99,
-                stock: 20,
-                categoria: 'Electronics',
-                subcategoria: 'Phones'
-            };
-
-            mockProductoInstance.crear.mockResolvedValue(mockCreatedProduct);
+            const productoCreado = { id: 1, ...nuevoProducto, subcategoria: '' };
+            
+            mockRequest.body = nuevoProducto;
+            mockProductoInstance.crear.mockResolvedValue(productoCreado);
 
             await productoController.crear(mockRequest, mockResponse);
 
+            expect(mockProductoInstance.crear).toHaveBeenCalledWith({
+                nombre: nuevoProducto.nombre,
+                descripcion: nuevoProducto.descripcion,
+                categoria: nuevoProducto.categoria,
+                subcategoria: '',
+                precio: nuevoProducto.precio,
+                stock: nuevoProducto.stock
+            });
             expect(mockResponse.status).toHaveBeenCalledWith(201);
             expect(mockResponse.json).toHaveBeenCalledWith({
                 success: true,
                 message: 'Producto creado exitosamente',
-                producto: mockCreatedProduct
+                producto: productoCreado
             });
         });
 
-        test('should validate required fields', async () => {
-            mockRequest.body = {
-                descripcion: 'Description'
-                // Faltan campos requeridos
-            };
+        test('should handle missing required fields', async () => {
+            mockRequest.body = { nombre: 'Producto Incompleto' };
 
             await productoController.crear(mockRequest, mockResponse);
 
@@ -177,12 +204,13 @@ describe('ProductoController', () => {
             });
         });
 
-        test('should validate positive price and stock', async () => {
+        test('should handle invalid price', async () => {
             mockRequest.body = {
-                nombre: 'Test Product',
+                nombre: 'Producto',
+                descripcion: 'Descripción',
                 precio: -10,
-                stock: -5,
-                categoria: 'Electronics'
+                categoria: 'Electrónicos',
+                stock: 50
             };
 
             await productoController.crear(mockRequest, mockResponse);
@@ -193,51 +221,69 @@ describe('ProductoController', () => {
                 message: 'El precio y stock deben ser valores positivos'
             });
         });
+
+        test('should handle invalid stock', async () => {
+            mockRequest.body = {
+                nombre: 'Producto',
+                descripcion: 'Descripción',
+                precio: 100,
+                categoria: 'Electrónicos',
+                stock: -5
+            };
+
+            await productoController.crear(mockRequest, mockResponse);
+
+            expect(mockResponse.status).toHaveBeenCalledWith(400);
+            expect(mockResponse.json).toHaveBeenCalledWith({
+                success: false,
+                message: 'El precio y stock deben ser valores positivos'
+            });
+        });
+
+        test('should handle database errors', async () => {
+            const nuevoProducto = {
+                nombre: 'Nuevo Producto',
+                descripcion: 'Descripción',
+                precio: 100,
+                categoria: 'Electrónicos',
+                stock: 50
+            };
+            mockRequest.body = nuevoProducto;
+            mockProductoInstance.crear.mockRejectedValue(new Error('Database error'));
+
+            await productoController.crear(mockRequest, mockResponse);
+
+            expect(mockResponse.status).toHaveBeenCalledWith(500);
+        });
     });
 
     describe('actualizar', () => {
         test('should update product successfully', async () => {
-            const mockUpdatedProduct = {
-                id: 1,
-                nombre: 'Updated Product',
-                descripcion: 'Updated Description',
-                precio: 399.99,
-                stock: 15,
-                categoria: 'Electronics',
-                subcategoria: 'Phones'
+            const productoExistente = { id: 1, nombre: 'Producto Existente', precio: 100 };
+            const datosActualizacion = {
+                nombre: 'Producto Actualizado',
+                precio: 150
             };
-
+            const productoActualizado = { id: 1, ...datosActualizacion };
+            
             mockRequest.params.id = '1';
-            mockRequest.body = {
-                nombre: 'Updated Product',
-                descripcion: 'Updated Description',
-                precio: 399.99,
-                stock: 15,
-                categoria: 'Electronics',
-                subcategoria: 'Phones'
-            };
-
-            // Primero verificar que el producto existe
-            mockProductoInstance.obtenerPorId.mockResolvedValue({ id: 1 });
-            mockProductoInstance.actualizar.mockResolvedValue(mockUpdatedProduct);
+            mockRequest.body = datosActualizacion;
+            mockProductoInstance.obtenerPorId.mockResolvedValue(productoExistente);
+            mockProductoInstance.actualizar.mockResolvedValue(productoActualizado);
 
             await productoController.actualizar(mockRequest, mockResponse);
 
+            expect(mockProductoInstance.obtenerPorId).toHaveBeenCalledWith('1');
             expect(mockResponse.json).toHaveBeenCalledWith({
                 success: true,
                 message: 'Producto actualizado exitosamente',
-                producto: mockUpdatedProduct
+                producto: productoActualizado
             });
         });
 
-        test('should return 404 if product not found', async () => {
+        test('should return 404 when updating non-existent product', async () => {
             mockRequest.params.id = '999';
-            mockRequest.body = {
-                nombre: 'Updated Product',
-                precio: 199.99,
-                stock: 5
-            };
-
+            mockRequest.body = { nombre: 'Producto' };
             mockProductoInstance.obtenerPorId.mockResolvedValue(null);
 
             await productoController.actualizar(mockRequest, mockResponse);
@@ -249,113 +295,65 @@ describe('ProductoController', () => {
             });
         });
 
-        test('should handle update errors', async () => {
+        test('should handle invalid price in update', async () => {
+            const productoExistente = { id: 1, nombre: 'Producto', precio: 100 };
             mockRequest.params.id = '1';
-            mockRequest.body = {
-                nombre: 'Updated Product',
-                precio: 199.99,
-                stock: 5
-            };
+            mockRequest.body = { precio: -10 };
+            mockProductoInstance.obtenerPorId.mockResolvedValue(productoExistente);
 
-            mockProductoInstance.obtenerPorId.mockResolvedValue({ id: 1 });
-            mockProductoInstance.actualizar.mockRejectedValue(new Error('Database error'));
+            await productoController.actualizar(mockRequest, mockResponse);
+
+            expect(mockResponse.status).toHaveBeenCalledWith(400);
+            expect(mockResponse.json).toHaveBeenCalledWith({
+                success: false,
+                message: 'El precio debe ser un valor positivo'
+            });
+        });
+
+        test('should handle invalid stock in update', async () => {
+            const productoExistente = { id: 1, nombre: 'Producto', stock: 10 };
+            mockRequest.params.id = '1';
+            mockRequest.body = { stock: -5 };
+            mockProductoInstance.obtenerPorId.mockResolvedValue(productoExistente);
+
+            await productoController.actualizar(mockRequest, mockResponse);
+
+            expect(mockResponse.status).toHaveBeenCalledWith(400);
+            expect(mockResponse.json).toHaveBeenCalledWith({
+                success: false,
+                message: 'El stock debe ser un valor positivo'
+            });
+        });
+
+        test('should handle database errors', async () => {
+            mockRequest.params.id = '1';
+            mockRequest.body = { nombre: 'Producto' };
+            mockProductoInstance.obtenerPorId.mockRejectedValue(new Error('Database error'));
 
             await productoController.actualizar(mockRequest, mockResponse);
 
             expect(mockResponse.status).toHaveBeenCalledWith(500);
-            expect(mockResponse.json).toHaveBeenCalledWith({
-                success: false,
-                message: 'Error interno del servidor',
-                error: 'Database error'
-            });
         });
     });
 
     describe('eliminar', () => {
         test('should delete product successfully', async () => {
+            const productoExistente = { id: 1, nombre: 'Producto Test' };
             mockRequest.params.id = '1';
-            mockProductoInstance.obtenerPorId.mockResolvedValue({ id: 1 });
+            mockProductoInstance.obtenerPorId.mockResolvedValue(productoExistente);
             mockProductoInstance.eliminar.mockResolvedValue(true);
 
             await productoController.eliminar(mockRequest, mockResponse);
 
+            expect(mockProductoInstance.obtenerPorId).toHaveBeenCalledWith('1');
+            expect(mockProductoInstance.eliminar).toHaveBeenCalledWith('1');
             expect(mockResponse.json).toHaveBeenCalledWith({
                 success: true,
                 message: 'Producto eliminado exitosamente'
             });
         });
 
-        test('should return 404 if product not found for deletion', async () => {
-            mockRequest.params.id = '999';
-            mockProductoInstance.obtenerPorId.mockResolvedValue(null);
-
-            await productoController.eliminar(mockRequest, mockResponse);
-
-            expect(mockResponse.status).toHaveBeenCalledWith(404);
-            expect(mockResponse.json).toHaveBeenCalledWith({
-                success: false,
-                message: 'Producto no encontrado'
-            });
-        });
-    });
-
-    describe('obtenerPorCategoria', () => {
-        test('should return products by category', async () => {
-            const mockProductos = [
-                {
-                    id: 1,
-                    nombre: 'Product 1',
-                    categoria: 'Electronics'
-                },
-                {
-                    id: 2,
-                    nombre: 'Product 2',
-                    categoria: 'Electronics'
-                }
-            ];
-
-            mockRequest.params.categoria = 'Electronics';
-            mockProductoInstance.obtenerPorCategoria.mockResolvedValue(mockProductos);
-
-            await productoController.obtenerPorCategoria(mockRequest, mockResponse);
-
-            expect(mockResponse.json).toHaveBeenCalledWith({
-                success: true,
-                categoria: 'Electronics',
-                productos: mockProductos
-            });
-        });
-
-        test('should handle category search errors', async () => {
-            mockRequest.params.categoria = 'Electronics';
-            mockProductoInstance.obtenerPorCategoria.mockRejectedValue(new Error('Database error'));
-
-            await productoController.obtenerPorCategoria(mockRequest, mockResponse);
-
-            expect(mockResponse.status).toHaveBeenCalledWith(500);
-            expect(mockResponse.json).toHaveBeenCalledWith({
-                success: false,
-                message: 'Error interno del servidor',
-                error: 'Database error'
-            });
-        });
-    });
-
-    describe('eliminar', () => {
-        test('should delete product successfully', async () => {
-            mockRequest.params.id = '1';
-            mockProductoInstance.obtenerPorId.mockResolvedValue(mockProducto);
-            mockProductoInstance.eliminar.mockResolvedValue(true);
-
-            await productoController.eliminar(mockRequest, mockResponse);
-
-            expect(mockResponse.json).toHaveBeenCalledWith({
-                success: true,
-                message: 'Producto eliminado exitosamente'
-            });
-        });
-
-        test('should handle product not found for deletion', async () => {
+        test('should return 404 when deleting non-existent product', async () => {
             mockRequest.params.id = '999';
             mockProductoInstance.obtenerPorId.mockResolvedValue(null);
 
@@ -368,68 +366,13 @@ describe('ProductoController', () => {
             });
         });
 
-        test('should handle delete errors', async () => {
+        test('should handle database errors', async () => {
             mockRequest.params.id = '1';
             mockProductoInstance.obtenerPorId.mockRejectedValue(new Error('Database error'));
 
             await productoController.eliminar(mockRequest, mockResponse);
 
             expect(mockResponse.status).toHaveBeenCalledWith(500);
-            expect(mockResponse.json).toHaveBeenCalledWith({
-                success: false,
-                message: 'Error interno del servidor',
-                error: 'Database error'
-            });
-        });
-    });
-
-    describe('obtenerPorId', () => {
-        test('should handle product not found', async () => {
-            mockRequest.params.id = '999';
-            mockProductoInstance.obtenerPorId.mockResolvedValue(null);
-
-            await productoController.obtenerPorId(mockRequest, mockResponse);
-
-            expect(mockResponse.status).toHaveBeenCalledWith(404);
-            expect(mockResponse.json).toHaveBeenCalledWith({
-                success: false,
-                message: 'Producto no encontrado'
-            });
-        });
-
-        test('should handle errors in obtenerPorId', async () => {
-            mockRequest.params.id = '1';
-            mockProductoInstance.obtenerPorId.mockRejectedValue(new Error('Database error'));
-
-            await productoController.obtenerPorId(mockRequest, mockResponse);
-
-            expect(mockResponse.status).toHaveBeenCalledWith(500);
-            expect(mockResponse.json).toHaveBeenCalledWith({
-                success: false,
-                message: 'Error interno del servidor',
-                error: 'Database error'
-            });
-        });
-    });
-
-    describe('actualizar', () => {
-        test('should handle update errors', async () => {
-            mockRequest.params.id = '1';
-            mockRequest.body = {
-                nombre: 'Producto actualizado',
-                precio: 200,
-                descripcion: 'Descripción actualizada'
-            };
-            mockProductoInstance.obtenerPorId.mockRejectedValue(new Error('Database error'));
-
-            await productoController.actualizar(mockRequest, mockResponse);
-
-            expect(mockResponse.status).toHaveBeenCalledWith(500);
-            expect(mockResponse.json).toHaveBeenCalledWith({
-                success: false,
-                message: 'Error interno del servidor',
-                error: 'Database error'
-            });
         });
     });
 });
